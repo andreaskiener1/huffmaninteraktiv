@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Häufigkeitsanalyse und Huffman-Baum</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        .input-container {
+            margin-bottom: 20px;
+        }
+		.content {
+            text-align: left;
+            margin: 0 auto;
+            max-width: 800px;
+        }
+        input[type="text"] {
+            padding: 10px;
+            font-size: 1rem;
+            width: 80%;
+        }
+        .button-container {
+            margin-top: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 1rem;
+            margin: 5px;
+            cursor: pointer;
+        }
+        .circle-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 30px; /* Vergrößerter horizontaler Abstand zwischen den Kreisen */
+            margin-top: 50px; /* Vergrößerter Abstand zwischen den Zeilen */
+            position: relative;
+        }
+        .circle {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            width: 40px; /* Halbiert */
+            height: 40px; /* Halbiert */
+            background-color: #87CEEB;
+            cursor: pointer;
+            position: relative;
+        }
+        .circle.selected {
+            border: 2px solid red;
+        }
+        .circle.fixed {
+            border: 2px solid gray;
+            cursor: default;
+        }
+        .letter-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .svg-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+    </style>
+</head>
+<body>
+<h2> Huffman-Baum interaktiv</h2>
+<div class="content">
+Bedienungshinweis:<br>
+<ul>
+<li>Der Button "Start" ermittelt die absolute Häufigkeit der Buchstaben des eingegebenen Textes und gibt das Ergebnis aufsteigend sortiert aus.</li>
+<li>Die Buchstaben können paarweise mit einem Mausklick ausgewählt werden.</li>
+<li>Der Button "Zusammenführen" erstellet erstellt einen neuen Knoten mit der Summe der absoluten Häufigkeiten der beiden ausgewählten Knoten.
+</ul>
+</div>
+<div class="input-container">
+    <input type="text" id="inputText" placeholder="Geben Sie Ihren Text hier ein">
+</div>
+
+<div class="button-container">
+    <button onclick="sortieren()">Start</button>
+    <button onclick="zusammenfuehren()">Zusammenführen</button>
+    <button onclick="loeschen()">Löschen</button> <!-- Neuer Löschen-Button -->
+</div>
+
+<div id="circleRows">
+    <div id="circleContainer" class="circle-container"></div>
+</div>
+
+<svg class="svg-container" id="svgContainer"></svg>
+
+<script>
+    let letterFrequencies = {};
+    let selectedCircles = [];
+    let currentRow = 0;
+
+    function sortieren() {
+        const text = document.getElementById("inputText").value.toLowerCase();
+        letterFrequencies = {};
+
+        for (let char of text) {
+            if (char.match(/[a-z]/)) {
+                letterFrequencies[char] = (letterFrequencies[char] || 0) + 1;
+            }
+        }
+        renderCircles(letterFrequencies, "circleContainer");
+    }
+
+    function renderCircles(frequencies, containerId) {
+        const circleContainer = document.getElementById(containerId);
+        circleContainer.innerHTML = "";
+        selectedCircles = [];
+
+        const sortedFrequencies = Object.entries(frequencies).sort((a, b) => a[1] - b[1]);
+
+        for (const [letter, frequency] of sortedFrequencies) {
+            const circle = document.createElement("div");
+            circle.classList.add("circle");
+            circle.onclick = () => toggleCircleSelection(circle, letter);
+
+            const letterLabel = document.createElement("div");
+            letterLabel.classList.add("letter-label");
+            letterLabel.textContent = letter.toUpperCase();
+
+            const frequencyLabel = document.createElement("div");
+            frequencyLabel.textContent = frequency;
+
+            circle.appendChild(letterLabel);
+            circle.appendChild(frequencyLabel);
+            circleContainer.appendChild(circle);
+        }
+    }
+
+    function toggleCircleSelection(circle, letter) {
+        if (circle.classList.contains("fixed")) return;
+
+        circle.classList.toggle("selected");
+
+        if (selectedCircles.includes(letter)) {
+            selectedCircles = selectedCircles.filter((c) => c !== letter);
+        } else {
+            selectedCircles.push(letter);
+        }
+    }
+
+    function zusammenfuehren() {
+        const newFrequencies = {};
+        const circleContainer = document.getElementById("circleContainer");
+
+        for (let i = 0; i < selectedCircles.length; i += 2) {
+            const letter1 = selectedCircles[i];
+            const letter2 = selectedCircles[i + 1];
+
+            if (letter1 && letter2) {
+                const combinedFrequency = letterFrequencies[letter1] + letterFrequencies[letter2];
+                const newLetter = `${letter1}${letter2}`;
+                newFrequencies[newLetter] = combinedFrequency;
+
+                const newRow = document.createElement("div");
+                newRow.classList.add("circle-container");
+                newRow.id = `circleContainer-${++currentRow}`;
+                
+                newRow.style.marginTop = "60px"; // Erhöhtes marginTop für zusätzlichen Abstand zwischen den Zeilen
+                
+                document.getElementById("circleRows").appendChild(newRow);
+
+                const combinedCircle = createCombinedCircle(newRow, newLetter, combinedFrequency, letter1, letter2);
+
+                const circle1 = Array.from(document.querySelectorAll(".circle")).find(circle => circle.querySelector(".letter-label").textContent.toUpperCase() === letter1.toUpperCase());
+                const circle2 = Array.from(document.querySelectorAll(".circle")).find(circle => circle.querySelector(".letter-label").textContent.toUpperCase() === letter2.toUpperCase());
+
+                if (circle1 && circle2 && combinedCircle) {
+                    drawLineBetweenCircles(circle1, combinedCircle, "0");
+                    drawLineBetweenCircles(circle2, combinedCircle, "1");
+                }
+
+                if (circle1) circle1.classList.add("fixed");
+                if (circle2) circle2.classList.add("fixed");
+            }
+        }
+
+        for (let letter in letterFrequencies) {
+            if (!selectedCircles.includes(letter)) {
+                newFrequencies[letter] = letterFrequencies[letter];
+            }
+        }
+
+        letterFrequencies = newFrequencies;
+        selectedCircles = [];
+    }
+
+    function createCombinedCircle(row, newLetter, frequency, letter1, letter2) {
+        const circle1 = Array.from(document.querySelectorAll(".circle")).find(circle => circle.querySelector(".letter-label").textContent === letter1.toUpperCase());
+        const circle2 = Array.from(document.querySelectorAll(".circle")).find(circle => circle.querySelector(".letter-label").textContent === letter2.toUpperCase());
+
+        const x1 = circle1.getBoundingClientRect().left + circle1.offsetWidth / 2;
+        const x2 = circle2.getBoundingClientRect().left + circle2.offsetWidth / 2;
+        const xMiddle = (x1 + x2) / 2;
+
+        const combinedCircle = document.createElement("div");
+        combinedCircle.classList.add("circle");
+        combinedCircle.style.position = "absolute";
+        combinedCircle.style.left = `${xMiddle - 20}px`; // Halbierte Kreisgröße anpassen
+        combinedCircle.style.marginTop = "20px";
+        combinedCircle.onclick = () => toggleCircleSelection(combinedCircle, newLetter);
+
+        const letterLabel = document.createElement("div");
+        letterLabel.classList.add("letter-label");
+        letterLabel.textContent = newLetter.toUpperCase();
+
+        const frequencyLabel = document.createElement("div");
+        frequencyLabel.textContent = frequency;
+
+        combinedCircle.appendChild(letterLabel);
+        combinedCircle.appendChild(frequencyLabel);
+        row.appendChild(combinedCircle);
+
+        return combinedCircle;
+    }
+
+    function drawLineBetweenCircles(circle1, circle2, label) {
+        const svgContainer = document.getElementById("svgContainer");
+
+        const rect1 = circle1.getBoundingClientRect();
+        const rect2 = circle2.getBoundingClientRect();
+
+        const x1 = rect1.left + rect1.width / 2;
+        const y1 = rect1.bottom;
+        const x2 = rect2.left + rect2.width / 2;
+        const y2 = rect2.top;
+
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", x1);
+        line.setAttribute("y1", y1);
+        line.setAttribute("x2", x2);
+        line.setAttribute("y2", y2);
+        line.setAttribute("stroke", "black");
+        svgContainer.appendChild(line);
+
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", (x1 + x2) / 2);
+        text.setAttribute("y", (y1 + y2) / 2 - 5);
+        text.setAttribute("text-anchor", "middle");
+        text.setAttribute("font-size", "12");
+        text.textContent = label;
+        svgContainer.appendChild(text);
+    }
+
+    function loeschen() {
+        document.getElementById("inputText").value = "";
+        document.getElementById("circleContainer").innerHTML = "";
+        document.getElementById("circleRows").innerHTML = '<div id="circleContainer" class="circle-container"></div>';
+        document.getElementById("svgContainer").innerHTML = "";
+        letterFrequencies = {};
+        selectedCircles = [];
+        currentRow = 0;
+    }
+</script>
+
+</body>
+</html>
